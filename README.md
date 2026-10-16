@@ -5,6 +5,7 @@
 [![CI](https://github.com/codercops/toolbelt/actions/workflows/ci.yml/badge.svg)](https://github.com/codercops/toolbelt/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/codercops/toolbelt?labelColor=0A0B0F&color=9E7BFF&logo=github)](https://github.com/codercops/toolbelt/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/codercops/toolbelt?labelColor=0A0B0F&color=8A93A8)](https://github.com/codercops/toolbelt/commits)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2.svg?labelColor=0A0B0F&logo=discord&logoColor=white)](https://discord.gg/mpGdJyjaRQ)
 [![Made by CODERCOPS](https://img.shields.io/badge/by-CODERCOPS-9E7BFF.svg?labelColor=0A0B0F)](https://www.codercops.com)
 
 A developer's toolbelt: fast, privacy-first browser tools. Everything runs client-side, so there is no login, no upload, and no data leaves your tab. Live at **[tools.codercops.com](https://tools.codercops.com)**.
@@ -103,6 +104,8 @@ Note: Type-checking a fresh clone will fail if `generated/og-fonts.ts` doesn't e
 
 tools.codercops.com runs on Cloudflare Workers through the OpenNext adapter (`wrangler.jsonc`, `open-next.config.ts`), deployed by Workers Builds: build with `npx opennextjs-cloudflare build`, deploy with `npx opennextjs-cloudflare deploy` (`--env dev` for the `toolbelt-dev` develop Worker). The only build variable is `NEXT_PUBLIC_DEPLOY_ENV` (`production`, or `develop`, which makes the site noindex). The GitHub star count is cached in the `toolbelt-cache` R2 bucket. `npm run preview` builds and serves the Worker locally. If you fork it, update the domain in `lib/tools.ts` (`SITE_URL`), `lib/og.tsx:198,212`, `lib/invoice-pdf.ts:315` and `routes` in `wrangler.jsonc` so the sitemap and canonical URLs point at your host, and update `GITHUB_REPO` in `lib/tools.ts` so the star-count link points at your fork.
 
+Verifying site ownership in Google Search Console and Bing Webmaster Tools is optional. Configure `GOOGLE_SITE_VERIFICATION` and/or `BING_SITE_VERIFICATION` as secrets on your Worker rather than plain-text environment variables (plain-text variables are removed on subsequent deploys because `keep_vars` is not enabled in `wrangler.jsonc`, whereas secrets persist across deploys, are available at runtime, and require no rebuild). Run `npx wrangler secret put GOOGLE_SITE_VERIFICATION` and `npx wrangler secret put BING_SITE_VERIFICATION` (pass `--env dev` for the development Worker). Alternatively, add both with type `Secret` under Cloudflare dashboard → Workers & Pages → your Worker → Settings → Variables and Secrets. Each token renders its ownership meta tag (`google-site-verification`, and Bing's `msvalidate.01`) only when its secret is configured, so previews and forks that leave them unset render no verification tags at all.
+
 ## Add a tool
 
 The tool set is a single typed registry in [`lib/tools.ts`](lib/tools.ts). The home grid, per-tool metadata, JSON-LD (SoftwareApplication, breadcrumb, FAQ), social share images, hero, FAQ, CTA, sitemap, web manifest, and command palette all derive from it. To add a tool:
@@ -135,7 +138,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full flow.
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md). In short: keep logic in `lib/`, add a test, and make sure `npm run lint && npm run test && npm run build` passes. If a tool proves useful, a star helps other developers find it.
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md). Questions? Come chat on our [Discord](https://discord.gg/mpGdJyjaRQ). In short: keep logic in `lib/`, add a test, and make sure `npm run lint && npm run test && npm run build` passes. If a tool proves useful, a star helps other developers find it.
 
 ## Security
 

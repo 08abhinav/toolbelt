@@ -10,6 +10,14 @@ Release PRs go `develop` → `production` and are merged as a merge commit
 
 Closes #
 
+## How I tested this
+
+<!-- Required. What you ran or clicked through to check this works. -->
+
+## AI assistance
+
+<!-- For contributor PRs. Write "none", or name the tool and what you used it for. See CONTRIBUTING.md. -->
+
 ## Type of change
 
 - [ ] Bug fix
@@ -20,8 +28,10 @@ Closes #
 
 ## Checklist
 
+- [ ] I was assigned the linked issue
 - [ ] `npm run lint && npm run test && npm run build` passes locally
 - [ ] Logic changes live in `lib/` and have a test in `lib/__tests__/`
+- [ ] For a bug fix: the new test fails without my change
 - [ ] No analytics, trackers, or calls that send user data off-device
 - [ ] Works in both light and dark themes (if UI changed)
 - [ ] Inputs have labels and it works with the keyboard alone (if UI changed)
