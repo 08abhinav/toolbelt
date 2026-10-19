@@ -17,6 +17,7 @@ body:
         - URL encoder/decoder
         - Invoice generator
         - Color converter & contrast checker
+        - Unix timestamp converter
         - Shell (theme, command palette, header)
         - Other / not sure
     validations:

@@ -318,6 +318,59 @@ export const TOOLS: Tool[] = [
     sitemapPriority: 0.9,
   },
   {
+    slug: "timestamp-converter",
+    path: "/timestamp-converter",
+    title: "Unix Timestamp Converter",
+    tagline: "Time",
+    cardDescription:
+      "Convert Unix timestamps and dates with automatic unit detection, UTC, local time, ISO 8601, and relative time.",
+    features: ["Epoch to date", "Date to epoch", "Seconds or ms", "ISO 8601", "Relative time"],
+    accentVar: "--green",
+    accentHex: "#3FDD6B",
+    metaTitle: "Unix Timestamp Converter - Free Online Tool",
+    metaDescription:
+      "Convert Unix timestamps to readable dates and dates to epoch time. Detect seconds or milliseconds, view UTC and local time, and copy ISO 8601 output.",
+    ogTitle: "Unix Timestamp Converter - CODERCOPS Tools",
+    ogDescription:
+      "Convert Unix timestamps and dates. Detect seconds or milliseconds, inspect UTC and local time, and copy ISO 8601 output.",
+    heroBreadcrumb: "Time",
+    heroHeading: "Unix Timestamp Converter",
+    heroDim: "",
+    heroDescription:
+      "Convert epoch timestamps to readable dates or dates to Unix time. All conversions run locally in your browser.",
+    jsonLdName: "Unix Timestamp Converter",
+    jsonLdDescription:
+      "Free online Unix timestamp converter for epoch-to-date and date-to-epoch conversions, with automatic unit detection and ISO 8601 output.",
+    applicationCategory: "DeveloperApplication",
+    faqs: [
+      {
+        q: "What is a Unix timestamp?",
+        a: "A Unix timestamp measures elapsed time from 1970-01-01 00:00:00 UTC. It is commonly represented in seconds or milliseconds.",
+      },
+      {
+        q: "How can I tell seconds from milliseconds?",
+        a: "This tool estimates the unit from the number's magnitude. You can also select seconds, milliseconds, microseconds, or nanoseconds manually.",
+      },
+      {
+        q: "Are my timestamps sent to a server?",
+        a: "No. Conversion happens locally in your browser. The values you enter are not uploaded by this tool.",
+      },
+      {
+        q: "Which date formats are supported?",
+        a: "ISO 8601 timestamps and date strings understood by your browser are supported. For unambiguous results, include a timezone such as Z or an explicit UTC offset.",
+      },
+    ],
+    cta: {
+      headline: "Building tools that handle dates and APIs?",
+      sub: "CODERCOPS builds production-grade backends, REST APIs, and full-stack applications for startups and businesses.",
+      primaryLabel: "View our work",
+      primaryHref: CTA_PROJECTS,
+      secondaryLabel: "Get a free quote",
+      secondaryHref: CTA_CONTACT,
+    },
+    sitemapPriority: 0.9,
+  },
+  {
     slug: "color-converter",
     path: "/color-converter",
     title: "Color Converter & Contrast Checker",
