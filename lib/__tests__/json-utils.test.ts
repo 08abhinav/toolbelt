@@ -240,6 +240,7 @@ describe("diffLines large-input guard", () => {
   });
 });
 
+
 describe("toYAML quotes strings YAML would read as other types", () => {
   it.each([
     [".5", '".5"'],
@@ -250,17 +251,50 @@ describe("toYAML quotes strings YAML would read as other types", () => {
     [".NaN", '".NaN"'],
     ["2026-04-15", '"2026-04-15"'],
     ["2026-04-15T10:00:00Z", '"2026-04-15T10:00:00Z"'],
+    ["1:30", '"1:30"'],
+    ["12:30:45", '"12:30:45"'],
+    ["1:30.5", '"1:30.5"'],
+    ["1_000", '"1_000"'],
+    ["1_000.5", '"1_000.5"'],
+    ["0x_1F", '"0x_1F"'],
+    ["0b101", '"0b101"'],
+    ["+0b101", '"+0b101"'],
+    ["0b1010_0111", '"0b1010_0111"'],
+    ["y", '"y"'],
+    ["Y", '"Y"'],
+    ["n", '"n"'],
+    ["N", '"N"'],
+    ["=", '"="'],
+    ["<<", '"<<"'],
+    ["2001-1-1 1:00:00", '"2001-1-1 1:00:00"'],
+    ["1__000", '"1__000"'],
+    ["1000_", '"1000_"'],
+    ["1.0_0", '"1.0_0"'],
+    [".5_0", '".5_0"'],
+    ["0b_101", '"0b_101"'],
+    ["0b101_", '"0b101_"'],
+    ["1_0:30", '"1_0:30"'],
+    ["1:30.", '"1:30."'],
   ])("quotes %s", (input, expected) => {
     const out = toYAML(JSON.stringify({ a: input }));
     expect(out.ok).toBe(true);
     if (out.ok) expect(out.value).toBe(`a: ${expected}\n`);
   });
 
-  it.each(["1.4.0", "v2", "hello"])("leaves %s unquoted", (input) => {
-    const out = toYAML(JSON.stringify({ a: input }));
+  it("quotes YAML merge keys", () => {
+    const out = toYAML('{"<<":"x"}');
     expect(out.ok).toBe(true);
-    if (out.ok) expect(out.value).toBe(`a: ${input}\n`);
+    if (out.ok) expect(out.value).toBe('"<<": x\n');
   });
+
+  it.each(["1.4.0", "v2", "hello", "1,000", "_1", "0b2", "a:b"])(
+    "leaves %s unquoted",
+    (input) => {
+      const out = toYAML(JSON.stringify({ a: input }));
+      expect(out.ok).toBe(true);
+      if (out.ok) expect(out.value).toBe(`a: ${input}\n`);
+    },
+  );
 });
 
 describe("toYAML empty array items", () => {
