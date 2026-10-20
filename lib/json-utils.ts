@@ -572,7 +572,12 @@ export function toXML(raw: string, rootTag = "root"): Result<string> {
   const v = validate(raw);
   if (!v.ok) return v;
   const parsed = llParse(raw);
-  function render(node: unknown, tag: string, indent: number): string {
+  function render(
+    node: unknown,
+    tag: string,
+    indent: number,
+    parent: "root" | "object" | "array" = "root",
+  ): string {
     const pad = "  ".repeat(indent);
     if (node === null) return `${pad}<${tag} nil="true"/>`;
     if (isLosslessNumber(node)) return `${pad}<${tag}>${node.toString()}</${tag}>`;
@@ -580,13 +585,22 @@ export function toXML(raw: string, rootTag = "root"): Result<string> {
       const itemTag = sanitizeTag(
         tag.endsWith("s") && tag.length > 1 ? tag.slice(0, -1) : `${tag}Item`
       );
-      return node.map((item) => render(item, itemTag, indent)).join("\n");
+      if (node.length === 0) return `${pad}<${tag}/>`;
+      if (parent === "object") {
+        return node
+          .map((item) => render(item, itemTag, indent, "array"))
+          .join("\n");
+      }
+      const inner = node
+        .map((item) => render(item, itemTag, indent + 1, "array"))
+        .join("\n");
+      return `${pad}<${tag}>\n${inner}\n${pad}</${tag}>`;
     }
     if (typeof node === "object") {
       const entries = Object.entries(node as Record<string, unknown>);
       if (entries.length === 0) return `${pad}<${tag}/>`;
       const inner = entries
-        .map(([k, v]) => render(v, sanitizeTag(k), indent + 1))
+        .map(([k, v]) => render(v, sanitizeTag(k), indent + 1, "object"))
         .join("\n");
       return `${pad}<${tag}>\n${inner}\n${pad}</${tag}>`;
     }
