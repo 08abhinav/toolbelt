@@ -35,9 +35,11 @@ function parseSyntaxError(raw: string, err: unknown): JsonError {
   const msg = err instanceof Error ? err.message : String(err);
   const posMatch = msg.match(/position (\d+)/i);
   const lineMatch = msg.match(/line (\d+) column (\d+)/i);
+
   let line = 1;
   let column = 1;
   let position = 0;
+
   if (posMatch) {
     position = parseInt(posMatch[1], 10);
     const lc = computeLineCol(raw, position);
@@ -46,11 +48,26 @@ function parseSyntaxError(raw: string, err: unknown): JsonError {
   } else if (lineMatch) {
     line = parseInt(lineMatch[1], 10);
     column = parseInt(lineMatch[2], 10);
+  } else {
+    try {
+      llParse(raw);
+    } catch (llError) {
+      if (llError instanceof Error) {
+        const llPosMatch = llError.message.match(/position (\d+)/i);
+        if (llPosMatch) {
+          position = parseInt(llPosMatch[1], 10);
+          const lc = computeLineCol(raw, position);
+          line = lc.line;
+          column = lc.column;
+        }
+      }
+    }
   }
+
   const suggestion = suggestFix(raw);
   return { message: msg.replace(/in JSON.*$/, "").trim() || "Invalid JSON", line, column, position, suggestion };
 }
-
+ 
 export function validate(raw: string): Result<true> {
   if (!raw.trim()) {
     return {
@@ -60,10 +77,18 @@ export function validate(raw: string): Result<true> {
   }
   try {
     JSON.parse(raw);
-    return { ok: true, value: true };
   } catch (e) {
     return { ok: false, error: parseSyntaxError(raw, e) };
   }
+  // `JSON.parse` silently keeps the last value of a duplicate key, but the
+  // lossless parser every conversion relies on rejects it. Detect it here so
+  // the conversions surface a friendly error instead of crashing the tool.
+  try {
+    llParse(raw);
+  } catch (e) {
+    return { ok: false, error: parseSyntaxError(raw, e) };
+  }
+  return { ok: true, value: true };
 }
 
 export function format(raw: string, indent: 2 | 4 = 2): Result<string> {
@@ -144,7 +169,9 @@ export function toCSV(raw: string): Result<string> {
   }
   const lines = [headers.map(escapeCsv).join(",")];
   for (const row of parsed as Record<string, unknown>[]) {
-    lines.push(headers.map((h) => escapeCsv(row?.[h as string])).join(","));
+    lines.push(headers.map((h) => escapeCsv(
+      row && typeof row === "object" && Object.hasOwn(row, h) ? row[h] : undefined
+    )).join(","));
   }
   return { ok: true, value: lines.join("\n") };
 }
@@ -322,18 +349,24 @@ export function toTypeScript(raw: string, rootName = "Root"): Result<string> {
 /* ------- YAML ------- */
 function needsQuote(s: string): boolean {
   if (s === "") return true;
+  if (s === "=" || s === "<<") return true;
   if (/^[\s-?:,\[\]{}#&*!|>'"%@`]/.test(s)) return true;
   if (/[\s:#]$/.test(s)) return true;
-  if (/^(true|false|null|yes|no|on|off|~)$/i.test(s)) return true;
+  if (/^(true|false|null|yes|no|on|off|y|n|~)$/i.test(s)) return true;
   if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(s)) return true;
   if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s)) return true;
   if (/^[+-]?0([xX][0-9a-fA-F]+|[oO][0-7]+)$/.test(s)) return true;
+  if (/^[+-]?\d[\d_]*(?::[0-5]?\d[\d_]*)+(?:\.[\d_]*)?$/.test(s)) return true;
+  if (/^[+-]?(?:\d[\d_]*(?:\.[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d[\d_]*)?$/.test(s)) return true;
+  if (/^[+-]?0[xX][0-9a-fA-F_]*_[0-9a-fA-F_]*$/.test(s)) return true;
+  if (/^[+-]?0[bB][01_]+$/.test(s)) return true;
   if (/^[+-]?\.(inf|nan)$/i.test(s)) return true;
-  if (/^\d{4}-\d{2}-\d{2}(?:[Tt ].*)?$/.test(s)) return true;
+  if (/^\d{4}-\d{1,2}-\d{1,2}(?:[Tt ].*)?$/.test(s)) return true;
   if (/[:#]\s|\s#/.test(s)) return true;
   if (/[\n\t\r"]/.test(s)) return true;
   return false;
 }
+
 
 function yamlString(s: string): string {
   if (!needsQuote(s)) return s;
@@ -341,10 +374,23 @@ function yamlString(s: string): string {
   return `"${escaped}"`;
 }
 
+// YAML 1.1 parsers such as PyYAML only read a number with an exponent as a float
+// when it has a dot and a signed exponent ("1.0e+3"). "1e3" and "2e+5" load as
+// strings there, so add what's missing. Every other number is kept exactly as
+// written, so long values don't lose digits.
+const EXPONENT_NUMBER = /^(-?\d+)(\.\d+)?([eE])([+-]?)(\d+)$/;
+
+function yamlNumber(text: string): string {
+  const match = EXPONENT_NUMBER.exec(text);
+  if (!match) return text;
+  const [, whole, fraction = ".0", e, sign, exponent] = match;
+  return `${whole}${fraction}${e}${sign || "+"}${exponent}`;
+}
+
 function yamlValue(value: unknown, indent: number): string {
   const pad = "  ".repeat(indent);
   if (value === null) return "null";
-  if (isLosslessNumber(value)) return value.toString();
+  if (isLosslessNumber(value)) return yamlNumber(value.toString());
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return ".nan";
@@ -548,14 +594,21 @@ function escapeXml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 function sanitizeTag(s: string): string {
-  return /^[A-Za-z_][\w.-]*$/.test(s) ? s : "item";
+  if (!s) return "item";
+  const cleaned = s.replace(/[^A-Za-z0-9_.-]/g, "_");
+  return /^[0-9.-]/.test(cleaned) ? `_${cleaned}` : cleaned;
 }
 
 export function toXML(raw: string, rootTag = "root"): Result<string> {
   const v = validate(raw);
   if (!v.ok) return v;
   const parsed = llParse(raw);
-  function render(node: unknown, tag: string, indent: number): string {
+  function render(
+    node: unknown,
+    tag: string,
+    indent: number,
+    parent: "root" | "object" | "array" = "root",
+  ): string {
     const pad = "  ".repeat(indent);
     if (node === null) return `${pad}<${tag} nil="true"/>`;
     if (isLosslessNumber(node)) return `${pad}<${tag}>${node.toString()}</${tag}>`;
@@ -563,13 +616,22 @@ export function toXML(raw: string, rootTag = "root"): Result<string> {
       const itemTag = sanitizeTag(
         tag.endsWith("s") && tag.length > 1 ? tag.slice(0, -1) : `${tag}Item`
       );
-      return node.map((item) => render(item, itemTag, indent)).join("\n");
+      if (node.length === 0) return `${pad}<${tag}/>`;
+      if (parent === "object") {
+        return node
+          .map((item) => render(item, itemTag, indent, "array"))
+          .join("\n");
+      }
+      const inner = node
+        .map((item) => render(item, itemTag, indent + 1, "array"))
+        .join("\n");
+      return `${pad}<${tag}>\n${inner}\n${pad}</${tag}>`;
     }
     if (typeof node === "object") {
       const entries = Object.entries(node as Record<string, unknown>);
       if (entries.length === 0) return `${pad}<${tag}/>`;
       const inner = entries
-        .map(([k, v]) => render(v, sanitizeTag(k), indent + 1))
+        .map(([k, v]) => render(v, sanitizeTag(k), indent + 1, "object"))
         .join("\n");
       return `${pad}<${tag}>\n${inner}\n${pad}</${tag}>`;
     }

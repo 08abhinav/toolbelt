@@ -16,6 +16,10 @@ body:
         - Base64
         - URL encoder/decoder
         - Invoice generator
+        - Color converter & contrast checker
+        - Unix timestamp converter
+        - Text case converter
+        - Number base converter
         - Shell (theme, command palette, header)
         - Other / not sure
     validations:

@@ -11,9 +11,67 @@ import {
   escapeForCode,
   parseJson5Compat,
   diffLines,
+  validate,
 } from "../json-utils";
 
 const BIG = '{"id":12345678901234567890,"pi":3.141592653589793238,"n":42}';
+
+describe("JSON Formatter Error Locations", () => {
+  it("extracts correct location for unquoted values", () => {
+    const result = validate('{"a": x}');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.line).toBe(1);
+      expect(result.error.column).toBe(7);
+    }
+  });
+
+  it("extracts correct location for multi-line JSON", () => {
+    const input = '{"a": 1,\n"b": tru\n}';
+    const result = validate(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.line).toBe(2);
+      expect(result.error.column).toBe(6);
+    }
+  });
+
+  it("keeps original location for duplicate keys with trailing comma", () => {
+    const result = validate('{"a":1,"a":2,}');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.line).toBe(1);
+      expect(result.error.column).toBe(14);
+    }
+  });
+
+  it("extracts correct location for unexpected end of input", () => {
+    const result = validate('{"a": ');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.line).toBe(1);
+      expect(result.error.column).toBe(7);
+    }
+  });
+
+  it("extracts correct location for undefined in array", () => {
+    const result = validate('[1, 2, undefined]');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.line).toBe(1);
+      expect(result.error.column).toBe(8);
+    }
+  });
+
+  it("keeps existing correct locations intact", () => {
+    const result = validate('{"a":1,}');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.line).toBe(1);
+      expect(result.error.column).toBe(8);
+    }
+  });
+});
 
 describe("lossless numbers", () => {
   it("preserves large integers and long decimals when formatting", () => {
@@ -49,6 +107,224 @@ describe("lossless numbers", () => {
   it("infers number type for big values in TypeScript output", () => {
     const ts = toTypeScript(BIG);
     expect(ts.ok && /id\??: number/.test(ts.value)).toBe(true);
+  });
+});
+
+describe("toCSV", () => {
+  it.each(["constructor", "toString", "__proto__"])(
+    "leaves missing %s cells empty while retaining own values",
+    (key) => {
+      const result = toCSV(`[{"driver":"Hamilton","${key}":"Mercedes"},{"driver":"Alonso"}]`);
+      expect(result).toEqual({ ok: true, value: `driver,${key}\nHamilton,Mercedes\nAlonso,` });
+    },
+  );
+
+  it("preserves falsy own values for names inherited from Object.prototype", () => {
+    const result = toCSV('[{"constructor":0,"toString":false,"__proto__":""},{"constructor":null}]');
+    expect(result).toEqual({ ok: true, value: "constructor,toString,__proto__\n0,false,\n,," });
+  });
+
+  it("preserves header order and quotes own values with special names", () => {
+    const result = toCSV('[{"toString":"a,b"},{"__proto__":{"a":1},"constructor":"say \\\"hi\\\""}]');
+    expect(result).toEqual({
+      ok: true,
+      value: 'toString,__proto__,constructor\n"a,b",,\n,"{""a"":1}","say ""hi"""',
+    });
+  });
+
+  it("keeps empty cells for null and primitive rows mixed with objects", () => {
+    const result = toCSV('[{"a":1},null,5,"text",true,false]');
+    expect(result).toEqual({ ok: true, value: "a\n1\n\n\n\n\n" });
+  });
+
+  it("retains own array cells when mixed with object rows", () => {
+    const result = toCSV('[{"0":"first","length":"size"},["second"]]');
+    expect(result).toEqual({ ok: true, value: "0,length\nfirst,size\nsecond,1" });
+  });
+
+  it("keeps primitive-only and empty array output unchanged", () => {
+    expect(toCSV('[null,5,"a,b",false]')).toEqual({ ok: true, value: '\n5\n"a,b"\nfalse' });
+    expect(toCSV("[]")).toEqual({ ok: true, value: "" });
+  });
+});
+
+describe("toXML", () => {
+  it("wraps a top-level array in a root element", () => {
+    const result = toXML("[1,2]");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).toContain(
+      "<root>\n  <rootItem>1</rootItem>\n  <rootItem>2</rootItem>\n</root>",
+    );
+  });
+
+  it("gives an empty element for an empty top-level array", () => {
+    const result = toXML("[]");
+    expect(result.ok && result.value).toContain("<root/>");
+  });
+
+  it("gives an empty element for an empty nested array", () => {
+    const result = toXML('{"a":[]}');
+    expect(result.ok && result.value).toContain("<a/>");
+  });
+
+  it("preserves structure for an array of arrays", () => {
+    const result = toXML('{"a":[[1,2],[3]]}');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).not.toContain("<a>");
+    expect(result.value).toContain(
+      [
+        "  <aItem>",
+        "    <aItemItem>1</aItemItem>",
+        "    <aItemItem>2</aItemItem>",
+        "  </aItem>",
+        "  <aItem>",
+        "    <aItemItem>3</aItemItem>",
+        "  </aItem>",
+      ].join("\n"),
+    );
+  });
+
+  it("does not change output for objects with nested arrays of objects", () => {
+    const result = toXML('{"users":[{"id":1},{"id":2}]}');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).not.toContain("<users>");
+    expect(result.value).toContain(
+      [
+        "  <user>",
+        "    <id>1</id>",
+        "  </user>",
+        "  <user>",
+        "    <id>2</id>",
+        "  </user>",
+      ].join("\n"),
+    );
+  });
+
+  it("writes array-of-values inside an object as items directly into parent", () => {
+    const result = toXML('{"tags":["x","y"]}');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).not.toContain("<tags>");
+    expect(result.value).toContain("  <tag>x</tag>\n  <tag>y</tag>");
+  });
+
+  it("wraps a top-level array of arrays, each sub-array in its own element", () => {
+    const result = toXML("[[1,2],[3]]");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).toContain(
+      [
+        "<root>",
+        "  <rootItem>",
+        "    <rootItemItem>1</rootItemItem>",
+        "    <rootItemItem>2</rootItemItem>",
+        "  </rootItem>",
+        "  <rootItem>",
+        "    <rootItemItem>3</rootItemItem>",
+        "  </rootItem>",
+        "</root>",
+      ].join("\n"),
+    );
+  });
+
+  it("sanitizes keys according to XML tag rules", () => {
+    const input = JSON.stringify({
+      "bad key": 1,
+      "1x": 2,
+      "@type": "Person",
+      "$ref": "#/a",
+      "a:b": 3,
+      "-a": 4,
+      "first-name": "Ada",
+      "user.id": 42,
+      _id: "abc",
+      "": "empty",
+      café: "latte",
+    });
+    const result = toXML(input);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).toContain("<bad_key>1</bad_key>");
+    expect(result.value).toContain("<_1x>2</_1x>");
+    expect(result.value).toContain("<_type>Person</_type>");
+    expect(result.value).toContain("<_ref>#/a</_ref>");
+    expect(result.value).toContain("<a_b>3</a_b>");
+    expect(result.value).toContain("<_-a>4</_-a>");
+    expect(result.value).toContain("<first-name>Ada</first-name>");
+    expect(result.value).toContain("<user.id>42</user.id>");
+    expect(result.value).toContain("<_id>abc</_id>");
+    expect(result.value).toContain("<item>empty</item>");
+    expect(result.value).toContain("<caf_>latte</caf_>");
+  });
+
+  it("sanitizes array element tag names derived from keys", () => {
+    const result = toXML('{"my tags":["a","b"]}');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).toContain("  <my_tag>a</my_tag>\n  <my_tag>b</my_tag>");
+  });
+});
+
+describe("toYAML writes numbers with an exponent as YAML 1.1 floats", () => {
+  // PyYAML needs a dot and a signed exponent to read a float, so it loads
+  // "1e3" as a string. The numbers keep their JSON digits otherwise.
+  const yamlOf = (json: string): string => {
+    const out = toYAML(json);
+    if (!out.ok) throw new Error(out.error.message);
+    return out.value;
+  };
+
+  it("adds the missing dot and sign, as in the example from the issue", () => {
+    expect(yamlOf('{"num":1e3,"tiny":1e-7}')).toBe("num: 1.0e+3\ntiny: 1.0e-7\n");
+  });
+
+  it.each([
+    ["1.5e3", "1.5e+3"],
+    ["1E3", "1.0E+3"],
+    ["2e+5", "2.0e+5"],
+    ["-1e3", "-1.0e+3"],
+    ["1.0e3", "1.0e+3"],
+    ["1.5e-3", "1.5e-3"],
+    ["1e-7", "1.0e-7"],
+    ["1.0E-3", "1.0E-3"],
+    ["1.0e+3", "1.0e+3"],
+    ["-2.5E+10", "-2.5E+10"],
+    ["1e03", "1.0e+03"],
+    ["0e0", "0.0e+0"],
+  ])("writes %s as %s", (written, expected) => {
+    expect(yamlOf(`{"num":${written}}`)).toBe(`num: ${expected}\n`);
+  });
+
+  it("keeps every digit of a long number", () => {
+    expect(yamlOf('{"num":1.2345678901234567890123e5}')).toBe("num: 1.2345678901234567890123e+5\n");
+    expect(yamlOf('{"num":12345678901234567890123e5}')).toBe("num: 12345678901234567890123.0e+5\n");
+  });
+
+  it.each(["12", "1.5", "-0.5", "0", "12345678901234567890", "-9007199254740993", "0.1"])(
+    "leaves %s unchanged",
+    (written) => {
+      expect(yamlOf(`{"num":${written}}`)).toBe(`num: ${written}\n`);
+    },
+  );
+
+  it("fixes numbers inside arrays and nested objects", () => {
+    expect(yamlOf('{"list":[1e3,2],"deep":{"items":[{"val":5E-2}]}}')).toBe(
+      "list:\n  - 1.0e+3\n  - 2\ndeep:\n  items:\n    - val: 5.0E-2\n",
+    );
+  });
+
+  it("does not touch strings that look like exponent numbers", () => {
+    expect(yamlOf('{"s":"1e3"}')).toBe('s: "1e3"\n');
   });
 });
 
@@ -94,6 +370,7 @@ describe("diffLines large-input guard", () => {
   });
 });
 
+
 describe("toYAML quotes strings YAML would read as other types", () => {
   it.each([
     [".5", '".5"'],
@@ -104,17 +381,50 @@ describe("toYAML quotes strings YAML would read as other types", () => {
     [".NaN", '".NaN"'],
     ["2026-04-15", '"2026-04-15"'],
     ["2026-04-15T10:00:00Z", '"2026-04-15T10:00:00Z"'],
+    ["1:30", '"1:30"'],
+    ["12:30:45", '"12:30:45"'],
+    ["1:30.5", '"1:30.5"'],
+    ["1_000", '"1_000"'],
+    ["1_000.5", '"1_000.5"'],
+    ["0x_1F", '"0x_1F"'],
+    ["0b101", '"0b101"'],
+    ["+0b101", '"+0b101"'],
+    ["0b1010_0111", '"0b1010_0111"'],
+    ["y", '"y"'],
+    ["Y", '"Y"'],
+    ["n", '"n"'],
+    ["N", '"N"'],
+    ["=", '"="'],
+    ["<<", '"<<"'],
+    ["2001-1-1 1:00:00", '"2001-1-1 1:00:00"'],
+    ["1__000", '"1__000"'],
+    ["1000_", '"1000_"'],
+    ["1.0_0", '"1.0_0"'],
+    [".5_0", '".5_0"'],
+    ["0b_101", '"0b_101"'],
+    ["0b101_", '"0b101_"'],
+    ["1_0:30", '"1_0:30"'],
+    ["1:30.", '"1:30."'],
   ])("quotes %s", (input, expected) => {
     const out = toYAML(JSON.stringify({ a: input }));
     expect(out.ok).toBe(true);
     if (out.ok) expect(out.value).toBe(`a: ${expected}\n`);
   });
 
-  it.each(["1.4.0", "v2", "hello"])("leaves %s unquoted", (input) => {
-    const out = toYAML(JSON.stringify({ a: input }));
+  it("quotes YAML merge keys", () => {
+    const out = toYAML('{"<<":"x"}');
     expect(out.ok).toBe(true);
-    if (out.ok) expect(out.value).toBe(`a: ${input}\n`);
+    if (out.ok) expect(out.value).toBe('"<<": x\n');
   });
+
+  it.each(["1.4.0", "v2", "hello", "1,000", "_1", "0b2", "a:b"])(
+    "leaves %s unquoted",
+    (input) => {
+      const out = toYAML(JSON.stringify({ a: input }));
+      expect(out.ok).toBe(true);
+      if (out.ok) expect(out.value).toBe(`a: ${input}\n`);
+    },
+  );
 });
 
 describe("toYAML empty array items", () => {
@@ -225,6 +535,28 @@ describe("toTypeScript array items", () => {
       );
       const transpile = ts.transpileModule(topLevelObj.value, { reportDiagnostics: true });
       expect(transpile.diagnostics ?? []).toHaveLength(0);
+    }
+  });
+});
+
+describe("duplicate keys", () => {
+  const DUP = '{"a": 1, "a": 2}';
+
+  it("validate() rejects a duplicate key", () => {
+    const result = validate(DUP);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toContain("Duplicate key");
+    }
+  });
+
+  it("conversions surface a duplicate-key error instead of throwing", () => {
+    const results = [toCSV(DUP), toTypeScript(DUP), toYAML(DUP), toXML(DUP), sortKeys(DUP)];
+    for (const result of results) {
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toContain("Duplicate key");
+      }
     }
   });
 });
