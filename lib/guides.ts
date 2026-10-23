@@ -186,6 +186,78 @@ export const GUIDES: Guide[] = [
     relatedTools: ["jwt-decoder"],
     sitemapPriority: 0.8,
   },
+  {
+    slug: "create-a-professional-invoice",
+    path: "/guides/create-a-professional-invoice",
+    title: "How to Create a Professional Invoice for Free",
+    tagline: "Invoicing Guide",
+    cardDescription:
+      "A practical walkthrough of the details a client expects on an invoice, how to number and total one, and how to export a clean PDF without paid software.",
+    tags: ["Invoicing", "Freelancing", "Small Business", "PDF"],
+    accentVar: "--green",
+    accentHex: "#3FDD6B",
+    metaTitle: "How to Create a Professional Invoice for Free - Guide",
+    metaDescription:
+      "What a professional invoice must include, how to number and total one, and how to export a clean PDF in your browser for free.",
+    ogTitle: "How to Create a Professional Invoice for Free - CODERCOPS Guides",
+    ogDescription:
+      "What to include on an invoice, how to handle tax and payment terms, and how to make a free PDF in your browser.",
+    publishedAt: "2026-10-23",
+    updatedAt: "2026-10-23",
+    readingTime: "6 min read",
+    totalTime: "PT6M",
+    steps: [
+      {
+        name: "Collect the details both sides need",
+        text: "Write down your trading name, address and contact details, the client's legal name and billing address, and any purchase order or reference number they asked for. Having these ready avoids a second round of emails before the invoice can be paid.",
+        url: "#step-1",
+      },
+      {
+        name: "Number the invoice and set the dates",
+        text: "Give every invoice a unique, sequential number such as 2026-014, and never reuse one. Add the issue date and a due date calculated from your payment terms, so the client knows exactly when payment is expected.",
+        url: "#step-2",
+      },
+      {
+        name: "Describe the work in clear line items",
+        text: "List each deliverable with a description, quantity and rate. Use the quantity for hours, days or a fixed count so that quantity times rate gives the amount, and put the details the client recognises from the quote in the description.",
+        url: "#step-3",
+      },
+      {
+        name: "Total it, then add tax if it applies",
+        text: "The generator multiplies each quantity by its rate, adds the line amounts into a subtotal, then applies a single tax rate. If you agreed a discount, enter the discounted rate on the line itself, because the generator has no separate discount row. Use one currency throughout the document.",
+        url: "#step-4",
+      },
+      {
+        name: "Export a clean PDF and send it",
+        text: "Check the totals and payment details, then export a PDF so the layout cannot shift on another device. The CODERCOPS Invoice Generator builds the PDF in your browser and keeps the data local; send the file with a short email that repeats the due date.",
+        url: "#step-5",
+      },
+    ],
+    faqs: [
+      {
+        q: "What is the difference between an invoice and a receipt?",
+        a: "An invoice asks the client to pay for work that has been delivered, and usually includes payment terms and a due date. A receipt confirms that a payment has already been received. Keep both when you need a record of the full transaction.",
+      },
+      {
+        q: "Do I need to charge tax on my invoice?",
+        a: "It depends on where you and your client are, what you are selling, and whether you are registered for VAT, GST or sales tax. This guide is general information rather than tax advice: check the rules for your jurisdiction, or ask an accountant before adding or omitting tax.",
+      },
+      {
+        q: "How should I number my invoices?",
+        a: "Use a unique sequence without gaps, such as 2026-001, 2026-002, and so on. A year prefix makes older invoices easier to find. If you void an invoice, keep the number in your records instead of reusing it for a different job.",
+      },
+      {
+        q: "What payment terms should I put on an invoice?",
+        a: "Common terms are Net 7, Net 14 or Net 30, meaning payment is due that many days after the issue date. State the due date explicitly as well. Only mention late fees when they are agreed in your contract and allowed by local law.",
+      },
+      {
+        q: "Can I create an invoice without sending my data to a website?",
+        a: "Yes. The CODERCOPS Invoice Generator runs entirely in your browser: the details you type are used to render the preview and PDF locally and are not uploaded. Nothing is stored until you click Save, so closing the tab first loses what you typed; the invoices you save, and your sender details, stay in this browser until you delete them.",
+      },
+    ],
+    relatedTools: ["invoice-generator"],
+    sitemapPriority: 0.8,
+  },
 ];
 
 export function getGuide(slug: string): Guide | undefined {
